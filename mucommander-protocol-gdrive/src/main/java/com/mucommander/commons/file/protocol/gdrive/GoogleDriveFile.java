@@ -58,18 +58,19 @@ import com.mucommander.commons.io.RandomAccessOutputStream;
 public class GoogleDriveFile extends ProtocolFile implements ConnectionHandlerFactory {
     private static final Logger LOGGER = LoggerFactory.getLogger(GoogleDriveFile.class);
 
-    private File file;
+    private Optional<File> file;
     private AbstractFile parent;
 
     public static String FOLDER_MIME_TYPE = "application/vnd.google-apps.folder";
 
     protected GoogleDriveFile(FileURL url, File file) {
         super(url);
-        this.file = file;
+        this.file = Optional.ofNullable(file);
     }
 
     protected GoogleDriveFile(FileURL url) {
         super(url);
+        this.file = Optional.empty();
     }
 
     protected GoogleDriveConnHandler getConnHandler() throws IOException {
@@ -90,7 +91,7 @@ public class GoogleDriveFile extends ProtocolFile implements ConnectionHandlerFa
 
     @Override
     public long getDate() {
-        return Optional.ofNullable(file)
+        return file
                 .map(File::getModifiedTime)
                 .map(DateTime::getValue)
                 .orElse(0L);
@@ -110,10 +111,8 @@ public class GoogleDriveFile extends ProtocolFile implements ConnectionHandlerFa
 
     @Override
     public long getSize() {
-        if (file == null)
-            return 0;
-        Long size = file.getSize();
-        return size != null ? size.longValue() : 0;
+        return file.map(File::getSize)
+                .orElse(0L);
     }
 
     @Override
@@ -135,7 +134,7 @@ public class GoogleDriveFile extends ProtocolFile implements ConnectionHandlerFa
 
     @Override
     public boolean exists() {
-        return file != null;
+        return file.isPresent();
     }
 
     @Override
@@ -176,7 +175,8 @@ public class GoogleDriveFile extends ProtocolFile implements ConnectionHandlerFa
 
     @Override
     public boolean isDirectory() {
-        return file != null ? isFolder(file) : false;
+        return file.map(GoogleDriveFile::isFolder)
+                .orElse(false);
     }
 
     protected static boolean isFolder(File file) {
@@ -229,9 +229,13 @@ public class GoogleDriveFile extends ProtocolFile implements ConnectionHandlerFa
             String filename = getURL().getFilename();
             fileMetadata.setName(filename);
             fileMetadata.setMimeType(FOLDER_MIME_TYPE);
-            file = connHandler.getConnection().files().create(fileMetadata)
-                    .setFields("id")
-                    .execute();
+            file = Optional.ofNullable(
+                    connHandler.getConnection()
+                            .files()
+                            .create(fileMetadata)
+                            .setFields("id")
+                            .execute()
+            );
         }
     }
 
@@ -239,7 +243,7 @@ public class GoogleDriveFile extends ProtocolFile implements ConnectionHandlerFa
     public InputStream getInputStream() throws IOException, UnsupportedFileOperationException {
         try(GoogleDriveConnHandler connHandler = getConnHandler()) {
             return connHandler.getConnection().files()
-                    .get(file.getId())
+                    .get(file.map(File::getId).orElse(null))
                     .executeMediaAsInputStream();
         }
     }
@@ -257,10 +261,12 @@ public class GoogleDriveFile extends ProtocolFile implements ConnectionHandlerFa
             new Thread(() -> {
                 InputStreamContent in = new InputStreamContent("application/octet-stream", input);
                 try {
-                    file = connHandler.getConnection().files()
-                            .create(fileMetadata, in)
-                            .setFields("id")
-                            .execute();
+                    file = Optional.ofNullable(
+                            connHandler.getConnection().files()
+                                    .create(fileMetadata, in)
+                                    .setFields("id")
+                                    .execute()
+                    );
                 } catch (IOException e) {
                     LOGGER.error("failed to copy to Google Drive", e);
                 }
@@ -310,14 +316,18 @@ public class GoogleDriveFile extends ProtocolFile implements ConnectionHandlerFa
 
     @Override
     public void delete() throws IOException, UnsupportedFileOperationException {
-        try(GoogleDriveConnHandler connHandler = getConnHandler()) {
-            connHandler.getConnection().files().delete(file.getId()).execute();
+        if (file.isPresent()) {
+            try (GoogleDriveConnHandler connHandler = getConnHandler()) {
+                connHandler.getConnection().files()
+                        .delete(file.get().getId())
+                        .execute();
+            }
         }
     }
 
     @Override
     public void renameTo(AbstractFile destFile) throws IOException, UnsupportedFileOperationException {
-        
+        throw new UnsupportedFileOperationException(FileOperation.RENAME);
     }
 
     @Override
@@ -355,6 +365,8 @@ public class GoogleDriveFile extends ProtocolFile implements ConnectionHandlerFa
     }
 
     protected String getId() {
-        return file.getId();
+        return file
+                .map(File::getId)
+                .orElse(null);
     }
 }
