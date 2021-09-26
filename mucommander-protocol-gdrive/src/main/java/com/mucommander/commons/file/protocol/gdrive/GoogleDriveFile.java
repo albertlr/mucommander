@@ -25,7 +25,9 @@ import java.io.PipedOutputStream;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
+import com.google.api.client.util.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,7 +90,10 @@ public class GoogleDriveFile extends ProtocolFile implements ConnectionHandlerFa
 
     @Override
     public long getDate() {
-        return file != null ? file.getModifiedTime().getValue() : 0;
+        return Optional.ofNullable(file)
+                .map(File::getModifiedTime)
+                .map(DateTime::getValue)
+                .orElse(0L);
     }
 
     @Override
