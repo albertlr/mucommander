@@ -244,7 +244,7 @@ public class GoogleDriveFile extends ProtocolFile implements ConnectionHandlerFa
         try(GoogleDriveConnHandler connHandler = getConnHandler()) {
             File fileMetadata = new File();
             String filename = getURL().getFilename();
-            GoogleDriveFile parent = (GoogleDriveFile) getParent();
+            GoogleDriveFile parent = getParentAsGoogleDriveFile();
             fileMetadata.setParents(Collections.singletonList(parent.getId()));
             fileMetadata.setName(filename);
             PipedOutputStream output = new PipedOutputStream();
@@ -261,6 +261,17 @@ public class GoogleDriveFile extends ProtocolFile implements ConnectionHandlerFa
                 }
             }).start();
             return output;
+        }
+    }
+
+    private GoogleDriveFile getParentAsGoogleDriveFile() {
+        Object parent = getParent();
+        if (parent instanceof GoogleDriveFile) {
+            return (GoogleDriveFile) parent;
+        } else if (parent instanceof GoogleDriveMonitoredFile) {
+            return ((GoogleDriveMonitoredFile) parent).getGoogleDriveFile();
+        } else {
+            throw new UnsupportedOperationException("Cannot determine parent type " + parent.getClass());
         }
     }
 
