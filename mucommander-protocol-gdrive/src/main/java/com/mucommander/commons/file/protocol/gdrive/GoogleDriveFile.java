@@ -58,7 +58,7 @@ import com.mucommander.commons.io.RandomAccessOutputStream;
 public class GoogleDriveFile extends ProtocolFile implements ConnectionHandlerFactory {
     private static final Logger LOGGER = LoggerFactory.getLogger(GoogleDriveFile.class);
 
-    private Optional<File> file;
+    private volatile Optional<File> file;
     private AbstractFile parent;
 
     public static String FOLDER_MIME_TYPE = "application/vnd.google-apps.folder";
